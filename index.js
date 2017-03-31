@@ -10,6 +10,10 @@ var dumpReader = require('./dumpReader.js'),
 	yargs = require('yargs');
     require('colors');
 
+function removeMath ( str ) {
+	return str.replace(/<math>[^]*?<\/math>/g, '');
+}
+
 function DumpGrepper ( regexp ) {
 	// inherit from EventEmitter
 	events.EventEmitter.call(this);
@@ -18,14 +22,32 @@ function DumpGrepper ( regexp ) {
 
 util.inherits(DumpGrepper, events.EventEmitter);
 
-DumpGrepper.prototype.grepRev = function ( revision, onlyFirst ) {
-	var result = this.re.exec( revision.text ),
-		matches = [];
-	while ( result ) {
-		matches.push( result );
-		if ( onlyFirst ) { break; }
-		result = this.re.exec( revision.text );
-	}
+DumpGrepper.prototype.grepRev = function ( revision, onlyFirst, lineMode ) {
+	var matches = [],
+		re = this.re,
+		source = lineMode ?
+			removeMath(revision.text).split(/\r\n?|\n/g) :
+			[ removeMath(revision.text) ];
+	source.forEach(function(text) {
+		var negate,
+			match,
+			success,
+			result;
+		while (true) {
+			if (onlyFirst && matches.length) return;
+			negate = false; match = null;
+			for (var i=0; i<re.length; i++) {
+				if (re[i] === '!') { negate = !negate; continue; }
+				result = re[i].exec(text);
+				success = negate ? (!result) : (!!result);
+				if (!success) return; // done with this text
+				// first non-negated match becomes the result.
+				if (result && !match) { match = result; }
+			}
+			matches.push( { match: match, text: text } );
+			if (lineMode) return;
+		}
+	});
 	if ( matches.length ) {
 		this.emit( 'match', revision, matches );
 	}
@@ -42,6 +64,11 @@ if (module === require.main) {
 		},
 		'm': {
 			description: 'Treat ^ and $ as matching beginning/end of *each* line, instead of beginning/end of entire article',
+			'boolean': true,
+			'default': false
+		},
+		'line': {
+			description: 'Run regular expression over each line of the article individually.',
 			'boolean': true,
 			'default': false
 		},
@@ -62,7 +89,8 @@ if (module === require.main) {
 		process.exit( 0 );
 	}
 
-	var flags = 'g';
+	var lineMode = argv.line;
+	var flags = lineMode ? '' : 'g';
 	if( argv.i ) {
 		flags += 'i';
 	}
@@ -79,10 +107,14 @@ if (module === require.main) {
         colors.mode = 'none';
     }
 
-	var re = new RegExp( argv._[0], flags );
+	var negate = false;
+	var re = argv._.map(function(r) {
+		if (r=='!') { return r; }
+		return new RegExp( r, flags );
+	});
 	var onlyFirst = argv.l;
 
-    console.log(re);
+	console.log(re);
 	var reader = new dumpReader.DumpReader(),
 		grepper = new DumpGrepper( re ),
 		stats = {
@@ -92,7 +124,7 @@ if (module === require.main) {
 
 	reader.on( 'revision', function ( revision ) {
 		stats.revisions++;
-		grepper.grepRev( revision, onlyFirst );
+		grepper.grepRev( revision, onlyFirst, lineMode );
 	} );
 
 	grepper.on( 'match', function ( revision, matches ) {
@@ -101,14 +133,19 @@ if (module === require.main) {
 			console.log( revision.page.title );
 			return;
 		}
+		console.log( '== Match: [[' + revision.page.title + ']] ==' );
 		for ( var i = 0, l = matches.length; i < l; i++ ) {
-			console.log( '== Match: [[' + revision.page.title + ']] ==' );
 			var m = matches[i];
-			//console.warn( JSON.stringify( m.index, null, 2 ) );
-			console.log(
-					revision.text.substr( m.index - 40, 40 ) +
-					m[0].green +
-					revision.text.substr( m.index + m[0].length, 40 ) );
+			if (lineMode) {
+				console.log(m.text.substr( 0, m.match.index ) +
+							m.match[0].green +
+							m.text.substr( m.match.index + m.match[0].length ));
+			} else {
+				console.log(
+					m.text.substr( m.match[0].index - 40, 40 ) +
+					m.match[0].green +
+						m.text.substr( m.match[0].index + m.match[0].length, 40 ) );
+			}
 		}
 	} );
 
