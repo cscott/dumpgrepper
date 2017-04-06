@@ -10,8 +10,21 @@ var dumpReader = require('./dumpReader.js'),
 	yargs = require('yargs');
     require('colors');
 
-function removeMath ( str ) {
-	return str.replace(/<math>[^]*?<\/math>/g, '');
+var extList = "categorytree ce charinsert chem gallery graph hiero imagemap indicator inputbox maplink math nowiki poem pre ref references score section source syntaxhighlight templatedata timeline".split(/\s+/g);
+var extRegexp = new RegExp('^<(' + extList.join('|') + ')(\\s|>)', 'i');
+
+function removeExtensions ( str ) {
+	var inExt = false;
+	return str.split(/(<\/?[^>]*>)/g).filter(function(s) {
+		if (inExt) {
+			if (s==inExt) { inExt = false; }
+			return false;
+		} else {
+			var m = extRegexp.exec(s);
+			if (m) { inExt = '</' + m[1] + '>'; return false; }
+			return true;
+		}
+	}).join('');
 }
 
 function DumpGrepper ( regexp ) {
@@ -22,12 +35,14 @@ function DumpGrepper ( regexp ) {
 
 util.inherits(DumpGrepper, events.EventEmitter);
 
-DumpGrepper.prototype.grepRev = function ( revision, onlyFirst, lineMode ) {
-	var matches = [],
+DumpGrepper.prototype.grepRev = function ( revision, opts ) {
+	var onlyFirst = !!(opts && opts.onlyFirst),
+		lineMode = !!(opts && opts.lineMode),
+		cleaned = (opts && opts.removeExtensions) ?
+			removeExtensions(revision.text) : revision.text,
+		matches = [],
 		re = this.re,
-		source = lineMode ?
-			removeMath(revision.text).split(/\r\n?|\n/g) :
-			[ removeMath(revision.text) ];
+		source = lineMode ? cleaned.split(/\r\n?|\n/g) : [ cleaned ];
 	source.forEach(function(text) {
 		var negate,
 			match,
@@ -57,6 +72,11 @@ module.exports.DumpGrepper = DumpGrepper;
 
 if (module === require.main) {
 	var opts = yargs.usage( 'Usage: zcat dump.xml.gz | $0 <regexp>', {
+		'e': {
+			description: 'Remove contents of extension tags',
+			'boolean': true,
+			'default': false
+		},
 		'i': {
 			description: 'Case-insensitive matching',
 			'boolean': true,
@@ -124,7 +144,11 @@ if (module === require.main) {
 
 	reader.on( 'revision', function ( revision ) {
 		stats.revisions++;
-		grepper.grepRev( revision, onlyFirst, lineMode );
+		grepper.grepRev( revision, {
+			onlyFirst: onlyFirst,
+			lineMode: lineMode,
+			removeExtensions: argv.e
+		});
 	} );
 
 	grepper.on( 'match', function ( revision, matches ) {
