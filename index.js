@@ -15,7 +15,7 @@ var extRegexp = new RegExp('^<(' + extList.join('|') + ')(\\s|>)', 'i');
 
 function removeExtensions ( str ) {
 	var inExt = false;
-	return str.split(/(<\/?[^>]*>)/g).filter(function(s) {
+	return str.split(/(<\/?[^<>]*>)/g).filter(function(s) {
 		if (inExt) {
 			if (s==inExt) { inExt = false; }
 			return false;
