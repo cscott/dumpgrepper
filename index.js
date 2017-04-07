@@ -22,6 +22,11 @@ function removeExtensions ( str ) {
 		} else {
 			var m = extRegexp.exec(s);
 			if (m) {
+				// HACK? Don't strip <ref> or <references> for now,
+				// since they contain wikitext which may be affected.
+				if (/^(ref|references)$/.test(m[1])) {
+					return true;
+				}
 				if (!/\/>$/.test(s)) {
 					inExt = '</' + m[1] + '>';
 				}
