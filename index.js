@@ -21,7 +21,12 @@ function removeExtensions ( str ) {
 			return false;
 		} else {
 			var m = extRegexp.exec(s);
-			if (m) { inExt = '</' + m[1] + '>'; return false; }
+			if (m) {
+				if (!/\/>$/.test(s)) {
+					inExt = '</' + m[1] + '>';
+				}
+				return false;
+			}
 			return true;
 		}
 	}).join('');
