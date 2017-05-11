@@ -57,7 +57,10 @@ DumpReader.prototype.makeParser = function() {
 
 	parser.on( 'endElementNS', function(elem, prefix, uri) {
 		// ping something!
-		if (elem === 'mediawiki') {
+		if (elem in ignoreNodes) {
+			/* jshint noempty: false */ // we know this is empty!
+			// ...
+		} else if (elem === 'mediawiki') {
 			self.complete = true;
 			//stream.pause();
 			self.emit('end', {});
