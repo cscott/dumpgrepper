@@ -53,6 +53,10 @@ DumpGrepper.prototype.grepRev = function ( revision, opts ) {
 		matches = [],
 		re = this.re,
 		source = lineMode ? cleaned.split(/\r\n?|\n/g) : [ cleaned ];
+	if (opts.formatMatch && !opts.formatMatch.test(revision.format)) {
+		// skip this revision, wrong format.
+		return;
+	}
 	source.forEach(function(text) {
 		var negate,
 			match,
@@ -110,6 +114,10 @@ if (module === require.main) {
 			description: 'Suppress  normal  output;  instead  print the name of each article from which output would normally have been  printed.',
 			'boolean': true,
 			'default': false
+		},
+		'format': {
+			description: 'Match only articles with a format matching the supplied regular expression.',
+			'default': false
 		}
 	} );
 	var argv = opts.argv;
@@ -157,7 +165,8 @@ if (module === require.main) {
 		grepper.grepRev( revision, {
 			onlyFirst: onlyFirst,
 			lineMode: lineMode,
-			removeExtensions: argv.e
+			removeExtensions: argv.e,
+			formatMatch: argv.format && new RegExp(argv.format),
 		});
 	} );
 

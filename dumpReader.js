@@ -28,7 +28,7 @@ DumpReader.prototype.makeParser = function() {
 		});
 		return obj;
 	}
-	var textNodes = flip(['id', 'text', 'title', 'minor', 'comment', 'username', 'timestamp']),
+	var textNodes = flip(['id', 'text', 'title', 'minor', 'comment', 'username', 'timestamp', 'format']),
 		boolNodes = flip(['minor', 'redirect']),
 		ignoreNodes = flip(['mediawiki', 'siteinfo', 'upload', 'thread'] ),
 		parser = new libxml.SaxPushParser();
